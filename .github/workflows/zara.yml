@@ -1,0 +1,35 @@
+name: Alerta stock Zara
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"   # cada 30 min (hora UTC). GitHub puede retrasarlo unos minutos.
+  workflow_dispatch:          # botón para lanzarlo a mano desde la pestaña Actions
+
+permissions:
+  contents: write             # necesario para guardar zara_state.json en el repo
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install requests
+
+      - name: Comprobar stock
+        env:
+          ZARA_EMAIL_FROM: ${{ secrets.ZARA_EMAIL_FROM }}
+          ZARA_EMAIL_PASSWORD: ${{ secrets.ZARA_EMAIL_PASSWORD }}
+          ZARA_EMAIL_TO: ${{ secrets.ZARA_EMAIL_TO }}
+        run: python zara_stock_alert.py --once
+
+      - name: Guardar estado (para no repetir el email)
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@users.noreply.github.com"
+          git add zara_state.json || true
+          git diff --cached --quiet || (git commit -m "Actualizar estado" && git push)
